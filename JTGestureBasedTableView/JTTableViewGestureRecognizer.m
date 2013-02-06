@@ -17,7 +17,7 @@ typedef enum {
     JTTableViewGestureRecognizerStateMoving,
 } JTTableViewGestureRecognizerState;
 
-CGFloat const JTTableViewCommitEditingRowDefaultLength = 80;
+CGFloat const JTTableViewCommitEditingRowDefaultLength = 61;
 CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough guess is 0.25
 
 @interface JTTableViewGestureRecognizer () <UIGestureRecognizerDelegate>
@@ -197,7 +197,6 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
         && [recognizer numberOfTouches] > 0) {
 
         // TODO: should ask delegate before changing cell's content view
-
         CGPoint location1 = [recognizer locationOfTouch:0 inView:self.tableView];
         
         NSIndexPath *indexPath = self.addingIndexPath;
@@ -209,10 +208,15 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
         self.state = JTTableViewGestureRecognizerStatePanning;
         
         UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
-
+        
         CGPoint translation = [recognizer translationInView:self.tableView];
-        cell.contentView.frame = CGRectOffset(cell.contentView.bounds, translation.x, 0);
-
+        
+        if (fabsf(translation.x) <= 80) {
+            cell.contentView.frame = CGRectOffset(cell.contentView.bounds, translation.x, 0);
+        }else {
+            return;
+        }
+        
         if ([self.delegate respondsToSelector:@selector(gestureRecognizer:didChangeContentViewTranslation:forRowAtIndexPath:)]) {
             [self.delegate gestureRecognizer:self didChangeContentViewTranslation:translation forRowAtIndexPath:indexPath];
         }
@@ -231,8 +235,8 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
             }
         }
 
-        if ([self.delegate respondsToSelector:@selector(gestureRecognizer:didEnterEditingState:forRowAtIndexPath:)]) {
-            [self.delegate gestureRecognizer:self didEnterEditingState:self.addingCellState forRowAtIndexPath:indexPath];
+        if ([self.delegate respondsToSelector:@selector(gestureRecognizer:didEnterEditingState:forRowAtIndexPath:forTranslation:)]) {
+            [self.delegate gestureRecognizer:self didEnterEditingState:self.addingCellState forRowAtIndexPath:indexPath forTranslation:translation];
         }
 
     } else if (recognizer.state == UIGestureRecognizerStateEnded) {
@@ -242,7 +246,6 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
         // Removes addingIndexPath before updating then tableView will be able
         // to determine correct table row height
         self.addingIndexPath = nil;
-
         UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
         CGPoint translation = [recognizer translationInView:self.tableView];
         
