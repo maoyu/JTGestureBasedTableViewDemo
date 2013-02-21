@@ -21,7 +21,7 @@ CGFloat const JTTableViewCommitEditingRowDefaultLength = 61;
 CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough guess is 0.25
 
 @interface JTTableViewGestureRecognizer () <UIGestureRecognizerDelegate>
-@property (nonatomic, weak) id <JTTableViewGestureAddingRowDelegate, JTTableViewGestureEditingRowDelegate, JTTableViewGestureMoveRowDelegate> delegate;
+@property (nonatomic, weak) id <JTTableViewGestureAddingRowDelegate, JTTableViewGestureEditingRowDelegate, JTTableViewGestureMoveRowDelegate, MYTableViewGestureSwipeRowDelegate> delegate;
 @property (nonatomic, weak) id <UITableViewDelegate>         tableViewDelegate;
 @property (nonatomic, weak) UITableView                     *tableView;
 @property (nonatomic, assign) CGFloat                        addingRowHeight;
@@ -31,10 +31,14 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
 @property (nonatomic, strong) UIPinchGestureRecognizer      *pinchRecognizer;
 @property (nonatomic, strong) UIPanGestureRecognizer        *panRecognizer;
 @property (nonatomic, strong) UILongPressGestureRecognizer  *longPressRecognizer;
+@property (nonatomic, strong) UISwipeGestureRecognizer *swipeRightRecognizer;
+@property (nonatomic, strong) UISwipeGestureRecognizer *swipeLeftRecognizer;
 @property (nonatomic, assign) JTTableViewGestureRecognizerState state;
 @property (nonatomic, strong) UIImage                       *cellSnapshot;
 @property (nonatomic, assign) CGFloat                        scrollingRate;
 @property (nonatomic, strong) NSTimer                       *movingTimer;
+@property (nonatomic, strong) UITableViewCell               *sideSwipeCell;
+@property (nonatomic) UISwipeGestureRecognizerDirection sideSwipeDirection;
 
 - (void)updateAddingIndexPathForCurrentLocation;
 - (void)commitOrDiscardCell;
@@ -46,9 +50,10 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
 @implementation JTTableViewGestureRecognizer
 @synthesize delegate, tableView, tableViewDelegate;
 @synthesize addingIndexPath, startPinchingUpperPoint, addingRowHeight;
-@synthesize pinchRecognizer, panRecognizer, longPressRecognizer;
+@synthesize pinchRecognizer, panRecognizer, longPressRecognizer, swipeRightRecognizer, swipeLeftRecognizer;
 @synthesize state, addingCellState;
 @synthesize cellSnapshot, scrollingRate, movingTimer;
+@synthesize sideSwipeDirection, sideSwipeView, sideSwipeCell;
 
 - (void)scrollTable {
     // Scroll tableview while touch point is on top or bottom part
@@ -369,6 +374,82 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
     }
 }
 
+// Remove the side swipe view.
+// If animated is YES, then the removal is animated using a bounce effect
+- (void) removeSideSwipeView:(BOOL)animated
+{
+    if (!sideSwipeCell) return;
+
+    if (animated)
+    {
+        [UIView beginAnimations:nil context:nil];
+        [UIView setAnimationDuration:0.2];
+        [UIView setAnimationDelegate:self];
+        [UIView setAnimationDidStopSelector:@selector(swipeAnimationStop)];
+        sideSwipeCell.frame = CGRectMake(0,sideSwipeCell.frame.origin.y,sideSwipeCell.frame.size.width, sideSwipeCell.frame.size.height);
+        [UIView commitAnimations];
+    }
+    else
+    {
+        sideSwipeCell.frame = CGRectMake(0,sideSwipeCell.frame.origin.y,sideSwipeCell.frame.size.width, sideSwipeCell.frame.size.height);
+        [sideSwipeView removeFromSuperview];
+    }
+    
+    sideSwipeCell = nil;
+}
+
+- (void)swipeAnimationStop {
+    [sideSwipeView removeFromSuperview];
+}
+
+- (void) addSwipeViewTo:(UITableViewCell*)cell direction:(UISwipeGestureRecognizerDirection)direction
+{
+    // Change the frame of the side swipe view to match the cell
+    // Change the frame of the side swipe view to match the cell
+    sideSwipeView.frame = cell.frame;
+    
+    // Add the side swipe view to the table below the cell
+    [tableView insertSubview:sideSwipeView belowSubview:cell];
+    
+    // Remember which cell the side swipe view is displayed on and the swipe direction
+    self.sideSwipeCell = cell;
+    sideSwipeDirection = direction;
+    
+    CGRect cellFrame = cell.frame;
+    
+    // Animate in the side swipe view
+    [UIView beginAnimations:nil context:nil];
+    [UIView setAnimationDuration:0.2];
+    // Move the side swipe view offscreen either to the left or the right depending on the swipe direction
+    sideSwipeCell.frame = CGRectMake(direction == UISwipeGestureRecognizerDirectionRight ? cellFrame.size.width : -cellFrame.size.width, cellFrame.origin.y, cellFrame.size.width, cellFrame.size.height);
+    [UIView commitAnimations];
+}
+
+- (void)swipeGestureRecognizer:(UISwipeGestureRecognizer *)recognizer {
+    if (recognizer && recognizer.state == UIGestureRecognizerStateEnded) {
+        CGPoint location = [recognizer locationInView:self.tableView];
+        NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:location];
+        UITableViewCell* cell = [tableView cellForRowAtIndexPath:indexPath];
+        
+        // If we are already showing the swipe view, remove it
+        if (cell.frame.origin.x != 0)
+        {
+            [self removeSideSwipeView:YES];
+            return;
+        }
+        
+        // Make sure we are starting out with the side swipe view and cell in the proper location
+        [self removeSideSwipeView:NO];
+        
+        [self addSwipeViewTo:cell direction:recognizer.direction];
+        
+        if ([self.delegate respondsToSelector:@selector(gestureRecognizer:forRowAtIndexPath:)]) {
+            [self.delegate gestureRecognizer:self forRowAtIndexPath:indexPath];
+        }
+
+    }
+}
+
 #pragma mark UIGestureRecognizer
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
@@ -559,6 +640,18 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
     [tableView addGestureRecognizer:longPress];
     longPress.delegate              = recognizer;
     recognizer.longPressRecognizer  = longPress;
+    
+    UISwipeGestureRecognizer* swipeRight = [[UISwipeGestureRecognizer alloc] initWithTarget:recognizer action:@selector(swipeGestureRecognizer:)];
+    swipeRight.direction = UISwipeGestureRecognizerDirectionRight;
+    [tableView addGestureRecognizer:swipeRight];
+    swipeRight.delegate          = recognizer;
+    recognizer.swipeRightRecognizer = swipeRight;
+    
+    UISwipeGestureRecognizer* swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:recognizer action:@selector(swipeGestureRecognizer:)];
+    swipeRight.direction = UISwipeGestureRecognizerDirectionLeft;
+    [tableView addGestureRecognizer:swipeLeft];
+    swipeLeft.delegate          = recognizer;
+    recognizer.swipeLeftRecognizer = swipeLeft;
 
     return recognizer;
 }
@@ -571,7 +664,8 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
 - (JTTableViewGestureRecognizer *)enableGestureTableViewWithDelegate:(id)delegate {
     if ( ! [delegate conformsToProtocol:@protocol(JTTableViewGestureAddingRowDelegate)]
         && ! [delegate conformsToProtocol:@protocol(JTTableViewGestureEditingRowDelegate)]
-        && ! [delegate conformsToProtocol:@protocol(JTTableViewGestureMoveRowDelegate)]) {
+        && ! [delegate conformsToProtocol:@protocol(JTTableViewGestureMoveRowDelegate)]
+        && ! [delegate conformsToProtocol:@protocol(MYTableViewGestureSwipeRowDelegate)]) {
         [NSException raise:@"delegate should at least conform to one of JTTableViewGestureAddingRowDelegate, JTTableViewGestureEditingRowDelegate or JTTableViewGestureMoveRowDelegate" format:nil];
     }
     JTTableViewGestureRecognizer *recognizer = [JTTableViewGestureRecognizer gestureRecognizerWithTableView:self delegate:delegate];

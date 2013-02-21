@@ -22,13 +22,16 @@ extern CGFloat const JTTableViewRowAnimationDuration;
 @protocol JTTableViewGestureAddingRowDelegate;
 @protocol JTTableViewGestureEditingRowDelegate;
 @protocol JTTableViewGestureMoveRowDelegate;
-
+@protocol MYTableViewGestureSwipeRowDelegate;
 
 @interface JTTableViewGestureRecognizer : NSObject <UITableViewDelegate>
 
 @property (nonatomic, weak, readonly) UITableView *tableView;
+@property (nonatomic, weak) UIView *sideSwipeView;
 
 + (JTTableViewGestureRecognizer *)gestureRecognizerWithTableView:(UITableView *)tableView delegate:(id)delegate;
+
+- (void) removeSideSwipeView:(BOOL)animated;
 
 @end
 
@@ -57,7 +60,7 @@ extern CGFloat const JTTableViewRowAnimationDuration;
 
 
 // Conform to JTTableViewGestureEditingRowDelegate to enable features
-// - swipe to edit cell
+// - Panning to edit cell
 @protocol JTTableViewGestureEditingRowDelegate <NSObject>
 
 // Panning (required)
@@ -72,6 +75,12 @@ extern CGFloat const JTTableViewRowAnimationDuration;
 
 @end
 
+// - swipe to cell
+@protocol MYTableViewGestureSwipeRowDelegate <NSObject>
+
+- (void)gestureRecognizer:(JTTableViewGestureRecognizer *)gestureRecognizer forRowAtIndexPath:(NSIndexPath *)indexPath;
+
+@end
 
 // Conform to JTTableViewGestureMoveRowDelegate to enable features
 // - long press to reorder cell
