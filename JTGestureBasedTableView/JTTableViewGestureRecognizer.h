@@ -28,6 +28,9 @@ extern CGFloat const JTTableViewRowAnimationDuration;
 
 @property (nonatomic, weak, readonly) UITableView *tableView;
 @property (nonatomic, weak) UIView *sideSwipeView;
+@property (nonatomic, strong) UISwipeGestureRecognizer *swipeRightRecognizer;
+@property (nonatomic, strong) UISwipeGestureRecognizer *swipeLeftRecognizer;
+
 
 + (JTTableViewGestureRecognizer *)gestureRecognizerWithTableView:(UITableView *)tableView delegate:(id)delegate;
 

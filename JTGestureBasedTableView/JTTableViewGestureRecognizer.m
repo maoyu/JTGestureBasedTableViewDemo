@@ -31,8 +31,8 @@ CGFloat const JTTableViewRowAnimationDuration          = 0.25;       // Rough gu
 @property (nonatomic, strong) UIPinchGestureRecognizer      *pinchRecognizer;
 @property (nonatomic, strong) UIPanGestureRecognizer        *panRecognizer;
 @property (nonatomic, strong) UILongPressGestureRecognizer  *longPressRecognizer;
-@property (nonatomic, strong) UISwipeGestureRecognizer *swipeRightRecognizer;
-@property (nonatomic, strong) UISwipeGestureRecognizer *swipeLeftRecognizer;
+//@property (nonatomic, strong) UISwipeGestureRecognizer *swipeRightRecognizer;
+//@property (nonatomic, strong) UISwipeGestureRecognizer *swipeLeftRecognizer;
 @property (nonatomic, assign) JTTableViewGestureRecognizerState state;
 @property (nonatomic, strong) UIImage                       *cellSnapshot;
 @property (nonatomic, assign) CGFloat                        scrollingRate;
